@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit Trail</title>
+<style>
+:root{
+  --bg:#f4f5f7; --panel:#ffffff; --ink:#14181f; --muted:#5d6672; --line:#e2e5ea;
+  --accent:#0f6e6e; --accent-soft:#e3f1f0; --red:#b42318; --red-soft:#fdecea;
+  --green:#147a3c; --green-soft:#e6f4ec; --amber:#9a5b00; --amber-soft:#fdf3e1;
+  --code:#0f141b; --code-ink:#d7dde5; --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1116; --panel:#161b22; --ink:#e6e9ee; --muted:#9aa4b1; --line:#262d36;
+    --accent:#4fb8b2; --accent-soft:#12302f; --red:#ff7b72; --red-soft:#3a1715;
+    --green:#56d38a; --green-soft:#10301d; --amber:#e3b341; --amber-soft:#33270d;
+    --code:#0a0d12; --code-ink:#d7dde5; --shadow:none;
+  }
+}
+*{box-sizing:border-box}
+html{color-scheme:light dark}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif}
+header{background:var(--panel);border-bottom:1px solid var(--line)}
+.wrap{max-width:1280px;margin:0 auto;padding:0 20px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:19px;letter-spacing:-.01em}
+.brand svg{flex:none}
+.tag{color:var(--muted);font-size:14px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:var(--panel);white-space:nowrap}
+.pill.ok{color:var(--green);border-color:transparent;background:var(--green-soft)}
+.pill.bad{color:var(--red);border-color:transparent;background:var(--red-soft)}
+.pill.warn{color:var(--amber);border-color:transparent;background:var(--amber-soft)}
+.pill.acc{color:var(--accent);border-color:transparent;background:var(--accent-soft)}
+main{padding:20px 0 60px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.start{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;padding:18px}
+.drop{border:1.5px dashed var(--line);border-radius:10px;padding:22px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop b{display:block;font-size:16px;margin-bottom:4px}
+.drop span{color:var(--muted);font-size:13px}
+.side{display:flex;flex-direction:column;gap:10px;justify-content:center}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+label.small{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+button,select{font:inherit;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:8px 12px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button.danger{background:var(--red);border-color:var(--red);color:#fff;font-weight:600}
+button:disabled{opacity:.45;cursor:not-allowed}
+.status{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:16px 0}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:16px;align-items:start}
+.panel-h{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line)}
+.panel-h h2{margin:0;font-size:15px}
+.timeline{max-height:78vh;overflow:auto;padding:8px 0}
+.ev{display:grid;grid-template-columns:22px 1fr;gap:10px;padding:8px 16px}
+.dot{width:10px;height:10px;border-radius:50%;margin-top:6px;background:var(--line);justify-self:center}
+.ev.step .dot{background:var(--muted)} .ev.run .dot{background:var(--accent)}
+.ev.acc .dot{background:var(--green)} .ev.rej .dot{background:var(--amber)}
+.ev.sec .dot{background:var(--red)} .ev.cont .dot{background:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
+.ev .t{font-size:14px}
+.ev .m{color:var(--muted);font-size:12px}
+.ev.sec .t{color:var(--red);font-weight:600}
+.ev.cont .t{color:var(--green);font-weight:600}
+details{margin-top:6px}
+summary{cursor:pointer;color:var(--accent);font-size:12.5px}
+pre{background:var(--code);color:var(--code-ink);font:12px/1.5 var(--mono);padding:10px 12px;border-radius:8px;overflow:auto;max-height:340px;margin:6px 0 0;white-space:pre-wrap;word-break:break-word}
+.quote{border-left:3px solid var(--red);background:var(--red-soft);padding:8px 10px;border-radius:0 8px 8px 0;font-size:13px;margin-top:6px;word-break:break-word}
+.report{padding:16px;display:flex;flex-direction:column;gap:18px}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.tile{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.tile .n{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.tile .l{font-size:12px;color:var(--muted)}
+h3{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 8px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:14px}
+th,td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:600;color:var(--muted);font-size:12px}
+td.neg{color:var(--red);font-weight:600}
+.finding{border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.finding .fh{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.finding .ft{font-weight:600}
+.loc{font-family:var(--mono);font-size:12.5px;background:var(--accent-soft);color:var(--accent);padding:1px 6px;border-radius:5px}
+.vals{display:flex;gap:18px;margin:8px 0;font-variant-numeric:tabular-nums;flex-wrap:wrap}
+.vals div span{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.vals div b{font-size:16px}
+.vals .stated b{color:var(--red)} .vals .re b{color:var(--green)}
+.finding p{margin:4px 0;font-size:14px}
+.finding .imp{color:var(--muted);font-size:13px}
+.empty{color:var(--muted);font-size:14px;padding:6px 0}
+.how{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0 0}
+.how div{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.how b{display:block;margin-bottom:2px}
+.how span{color:var(--muted);font-size:13.5px}
+.how .num{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:700;margin-right:6px}
+.banner{border-radius:10px;padding:14px 16px;display:flex;gap:14px;align-items:baseline;flex-wrap:wrap}
+.banner.bad{background:var(--red-soft)} .banner.good{background:var(--green-soft)}
+.banner .big{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.banner.bad .big{color:var(--red)} .banner.good .big{color:var(--green)}
+.banner .sub{color:var(--ink);font-size:14px}
+.finding.contained{border-color:transparent;background:var(--green-soft)}
+.finding.contained .ft{color:var(--green)}
+footer{color:var(--muted);font-size:12.5px;padding:24px 0 40px;border-top:1px solid var(--line);margin-top:24px}
+footer code{font-family:var(--mono);font-size:12px}
+.probe{border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.probe .row{justify-content:space-between}
+.lines div{font:12.5px/1.6 var(--mono)}
+.lines .blk{color:var(--green)} .lines .ok{color:var(--red)}
+@media (max-width:960px){.start,.grid,.how{grid-template-columns:1fr}.tiles{grid-template-columns:repeat(2,1fr)}.timeline{max-height:none}}
+@media (max-width:520px){.wrap{padding:0 16px}.start{padding:14px}}
+</style>
+</head>
+<body>
+<header><div class="wrap top">
+  <div>
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect x="1" y="1" width="24" height="24" rx="6" fill="var(--accent)"/><path d="M7 14l4 4 8-9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Audit Trail
+    </div>
+    <div class="tag">Financial model audits where every finding is backed by code that ran in a sealed sandbox.</div>
+  </div>
+  <div class="row">
+    <span class="pill ok">● Sandbox: no network</span>
+    <span class="pill acc" id="sbPill">Sandbox: …</span>
+    <span class="pill" id="modelPill">Model: …</span>
+  </div>
+</div></header>
+
+<main class="wrap">
+  <section class="card start">
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Upload an xlsx file">
+      <b>Drop a financial model (.xlsx)</b>
+      <span>or click to choose a file. Max 5 MB. Formulas are read, never executed as macros.</span>
+      <input type="file" id="file" accept=".xlsx" hidden>
+    </div>
+    <div class="side">
+      <label class="small">Or try the demo</label>
+      <div class="row">
+        <button id="demoPlanted">Demo model with planted errors</button>
+        <button id="demoClean">Clean control model</button>
+      </div>
+      <label class="small" for="provider">Inference</label>
+      <div class="row"><select id="provider"></select><span class="m tag" id="cfgNote"></span></div>
+    </div>
+  </section>
+
+  <section class="how" id="how">
+    <div><b><span class="num">1</span>Read, never run</b><span>The workbook is parsed to values and formulas. A scan flags hidden rows, white text, comments and names that try to instruct an AI.</span></div>
+    <div><b><span class="num">2</span>Prove in a sealed box</b><span>The agent writes Python checks. They run in a sandbox with no network, no secrets and a read-only copy of the data.</span></div>
+    <div><b><span class="num">3</span>No output, no finding</b><span>A finding is accepted only if a sandbox run printed both the stated and the recomputed number. A clean verdict needs a run too.</span></div>
+  </section>
+
+  <div class="status" id="status" hidden>
+    <span class="pill" id="filePill"></span>
+    <span class="pill" id="stagePill">Starting</span>
+    <span class="pill" id="stepPill">Step 0</span>
+    <span class="pill" id="timePill">0s</span>
+  </div>
+
+  <section class="grid" id="grid" hidden>
+    <div class="card">
+      <div class="panel-h"><h2>Live run</h2><span class="m tag" id="evCount">0 events</span></div>
+      <div class="timeline" id="timeline"></div>
+    </div>
+    <div class="card">
+      <div class="panel-h"><h2>Report</h2><span class="pill" id="verdict">In progress</span></div>
+      <div class="report">
+        <div id="banner" hidden></div>
+        <div class="tiles">
+          <div class="tile"><div class="n" id="tFind">0</div><div class="l">Proven findings</div></div>
+          <div class="tile"><div class="n" id="tRej">0</div><div class="l">Claims rejected, no evidence</div></div>
+          <div class="tile"><div class="n" id="tInj">0</div><div class="l">Injection flags</div></div>
+          <div class="tile"><div class="n" id="tRuns">0</div><div class="l">Sandbox runs</div></div>
+        </div>
+        <div id="ebitdaBox" hidden><h3>EBITDA, stated vs recomputed (Rs crore)</h3><div id="ebitda"></div></div>
+        <div><h3>Findings</h3><div id="findings"><div class="empty">Findings appear here once a sandbox run proves them.</div></div></div>
+        <div><h3>Security</h3>
+          <div id="security"><div class="empty">Nothing flagged yet.</div></div>
+          <div class="probe" style="margin-top:10px">
+            <div class="row">
+              <div><b>Containment test</b><div class="m tag">Runs exactly what a hidden instruction would want: read secrets, POST the workbook out, shell out to curl. Inside the sandbox.</div></div>
+              <button class="danger" id="probeBtn" disabled>Run attack probe</button>
+            </div>
+            <div id="probeOut"></div>
+          </div>
+        </div>
+        <div id="summaryBox" hidden><h3>Agent summary</h3><p id="summary" style="margin:0"></p></div>
+      </div>
+    </div>
+  </section>
+  <footer>Production setup: a Vultr Cloud Compute VM, with inference on Vultr Serverless Inference (OpenAI-compatible API). Sandbox: Docker with <code>--network none</code>, read-only root, all capabilities dropped, 512 MB memory and a 30 s time limit. Demo company Halcyra Software is fictional.</footer>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+let seenInj = {};
+let job = null, es = null, t0 = 0, timer = null, liveFindings = [], injections = 0, runs = 0, statedEbitda = {};
+
+async function loadConfig(){
+  const c = await (await fetch('/api/config')).json();
+  const sel = $('#provider'); sel.innerHTML = '';
+  c.providers.forEach(p => { const o = el('option', null, `${p} (${c.default_models[p]})`); o.value = p; sel.appendChild(o); });
+  if (!c.providers.length) { $('#cfgNote').textContent = 'No inference key configured on the server.'; }
+  $('#modelPill').textContent = c.default ? `Model: ${c.default_models[c.default]}` : 'Model: none';
+}
+
+function reset(name){
+  if (es) es.close();
+  clearInterval(timer);
+  liveFindings = []; injections = 0; runs = 0; statedEbitda = {};
+  $('#timeline').innerHTML = ''; $('#findings').innerHTML = '<div class="empty">Findings appear here once a sandbox run proves them.</div>';
+  $('#security').innerHTML = '<div class="empty">Nothing flagged yet.</div>'; $('#probeOut').innerHTML = '';
+  $('#ebitdaBox').hidden = true; $('#summaryBox').hidden = true; $('#banner').hidden = true; $('#how').hidden = true; seenInj = {};
+  ['#tFind','#tRej','#tInj','#tRuns'].forEach(s => $(s).textContent = '0');
+  $('#verdict').className = 'pill'; $('#verdict').textContent = 'In progress';
+  $('#status').hidden = false; $('#grid').hidden = false;
+  $('#filePill').textContent = name; $('#stagePill').textContent = 'Uploading'; $('#stepPill').textContent = 'Step 0';
+  $('#probeBtn').disabled = true;
+  t0 = Date.now(); timer = setInterval(() => $('#timePill').textContent = Math.round((Date.now()-t0)/1000) + 's', 1000);
+}
+
+async function start(form, name){
+  reset(name);
+  form.append('provider', $('#provider').value);
+  const r = await fetch('/api/jobs', {method:'POST', body: form});
+  const j = await r.json();
+  if (!r.ok) { addEv('sec', 'Could not start: ' + (j.detail || r.status)); $('#stagePill').textContent = 'Error'; clearInterval(timer); return; }
+  job = j.id;
+  es = new EventSource(`/api/jobs/${job}/events`);
+  es.onmessage = m => handle(JSON.parse(m.data));
+}
+
+function addEv(kind, title, meta, extra){
+  const row = el('div', 'ev ' + kind); row.appendChild(el('div', 'dot'));
+  const body = el('div'); body.appendChild(el('div', 't', title));
+  if (meta) body.appendChild(el('div', 'm', meta));
+  if (extra) extra.forEach(x => body.appendChild(x));
+  row.appendChild(body); $('#timeline').appendChild(row);
+  $('#timeline').scrollTop = $('#timeline').scrollHeight;
+  $('#evCount').textContent = $('#timeline').children.length + ' events';
+}
+function codeBlock(label, text){ const d = el('details'); d.appendChild(el('summary', null, label)); d.appendChild(el('pre', null, text || '(empty)')); return d; }
+const fmt = v => (typeof v === 'number') ? v.toLocaleString('en-IN', {maximumFractionDigits: 2, minimumFractionDigits: 2}) : String(v);
+
+function handle(ev){
+  switch(ev.type){
+    case 'parsing': $('#stagePill').textContent = 'Parsing workbook'; addEv('step', 'Reading workbook', ev.file); break;
+    case 'parsed':
+      $('#stagePill').textContent = 'Auditing'; $('#sbPill').textContent = 'Sandbox: ' + ev.sandbox;
+      statedEbitda = ev.stated_ebitda || {};
+      addEv('step', `Parsed ${ev.cells} cells in ${ev.sheets.length} sheets`, ev.sheets.join(' · '));
+      $('#probeBtn').disabled = false; break;
+    case 'start': $('#modelPill').textContent = 'Model: ' + ev.model; addEv('step', 'Agent started', `${ev.provider} · ${ev.model}`); break;
+    case 'injection_flagged': {
+      injections++; $('#tInj').textContent = injections;
+      const q = el('div', 'quote', ev.excerpt || ev.what_it_asked);
+      addEv('sec', `Hidden instruction at ${ev.location}`, `Found by ${ev.source}. Treated as data, not followed.`, [q]);
+      securityItem(ev); break; }
+    case 'llm_turn':
+      $('#stepPill').textContent = 'Step ' + ev.step;
+      addEv('step', `Step ${ev.step}: ${ev.tool_calls.length ? ev.tool_calls.join(', ') : 'thinking'}`, ev.text ? ev.text.slice(0, 220) : null); break;
+    case 'llm_retry': addEv('rej', 'Model busy, retrying', ev.error); break;
+    case 'model_switch': addEv('rej', `Switched model: ${ev.old} → ${ev.new}`, 'Quota or timeout on the first model'); break;
+    case 'sandbox_run':
+      runs++; $('#tRuns').textContent = runs;
+      addEv('run', `${ev.run_id}: ${ev.purpose}`, `exit ${ev.exit_code} · ${ev.seconds}s · ${ev.sandbox}`,
+            [codeBlock('Code', ev.code), codeBlock('Output', ev.stdout + (ev.stderr ? '\n--- stderr ---\n' + ev.stderr : ''))]); break;
+    case 'finding_accepted':
+      liveFindings.push(ev.finding); $('#tFind').textContent = liveFindings.length; renderFindings(liveFindings);
+      addEv('acc', `Proven: ${ev.finding.title}`, `${ev.finding.location} · evidence ${ev.finding.evidence_run_id}`); break;
+    case 'finding_rejected':
+      $('#tRej').textContent = (+$('#tRej').textContent) + 1;
+      addEv('rej', `Rejected: ${ev.finding.title || ev.finding.location}`, ev.reasons.join('; ')); break;
+    case 'containment':
+      addEv('cont', 'Contained: ' + ev.detail, `${ev.source} · ${ev.run_id} · ${(ev.blocked||[]).join(', ')}`);
+      securityItem({location: ev.run_id, source: ev.source, contained: ev.detail}); break;
+    case 'attack_probe': renderProbe(ev); addEv('sec', 'Attack probe ran in the sandbox', ev.detail, [codeBlock('Probe code', ev.code)]); break;
+    case 'finish': addEv('step', `Agent finished: ${ev.findings} findings, ${ev.rejected} rejected`, ev.summary ? ev.summary.slice(0, 260) : null); break;
+    case 'llm_unavailable': addEv('rej', 'Model unavailable, stopped early', ev.error); break;
+    case 'report_ready': loadReport(); break;
+    case 'error': addEv('sec', 'Error', ev.error); $('#stagePill').textContent = 'Error'; clearInterval(timer); break;
+  }
+}
+
+function securityItem(ev){
+  const box = $('#security'); if (box.querySelector('.empty')) box.innerHTML = '';
+  if (!ev.contained && seenInj[ev.location]) {
+    const card = seenInj[ev.location]; card.sources.add(ev.source);
+    card.meta.textContent = 'Found by ' + [...card.sources].join(' and ') + (card.concealed ? ' · concealed: ' + card.concealed : '');
+    return;
+  }
+  const d = el('div', ev.contained ? 'finding contained' : 'finding');
+  if (ev.contained) { d.appendChild(el('div', 'ft', 'Contained')); d.appendChild(el('p', null, ev.contained)); d.appendChild(el('div', 'imp', ev.source)); }
+  else {
+    const h = el('div', 'fh'); h.appendChild(el('div', 'ft', 'Prompt injection in the workbook')); h.appendChild(el('span', 'loc', ev.location)); d.appendChild(h);
+    const conc = ev.concealed && ev.concealed.length ? ev.concealed.join(', ') : '';
+    const meta = el('p', null, `Found by ${ev.source}${conc ? ' · concealed: ' + conc : ''}`); d.appendChild(meta);
+    d.appendChild(el('div', 'quote', ev.excerpt || ev.what_it_asked));
+    seenInj[ev.location] = {sources: new Set([ev.source]), meta, concealed: conc};
+  }
+  box.appendChild(d);
+}
+
+function renderFindings(list){
+  const box = $('#findings'); box.innerHTML = '';
+  if (!list.length) { box.appendChild(el('div', 'empty', 'No proven findings.')); return; }
+  list.forEach(f => {
+    const d = el('div', 'finding');
+    const h = el('div', 'fh'); const left = el('div');
+    left.appendChild(el('div', 'ft', `${f.id}. ${f.title}`));
+    const l = el('div'); l.appendChild(el('span', 'loc', f.range || f.location)); l.appendChild(document.createTextNode(' ')); l.appendChild(el('span', 'pill', f.category)); left.appendChild(l);
+    h.appendChild(left); h.appendChild(el('span', 'pill ok', 'proven · ' + (f.evidence_run_id || ''))); d.appendChild(h);
+    const v = el('div', 'vals');
+    const s = el('div', 'stated'); s.appendChild(el('span', null, 'Stated')); s.appendChild(el('b', null, fmt(f.stated_value)));
+    const r = el('div', 're'); r.appendChild(el('span', null, 'Recomputed')); r.appendChild(el('b', null, fmt(f.expected_value)));
+    v.appendChild(s); v.appendChild(r); d.appendChild(v);
+    d.appendChild(el('p', null, f.explanation)); d.appendChild(el('p', 'imp', f.impact));
+    if (f.evidence) { d.appendChild(codeBlock(`Evidence code (${f.evidence.run_id})`, f.evidence.code)); d.appendChild(codeBlock('Evidence output', f.evidence.stdout)); }
+    box.appendChild(d);
+  });
+}
+
+function renderEbitda(corrected){
+  const years = Object.keys(statedEbitda).filter(y => corrected[y] != null);
+  if (!years.length) return;
+  const t = el('table'); const hr = el('tr'); ['', ...years].forEach(y => hr.appendChild(el('th', null, y))); t.appendChild(hr);
+  const rows = [['Stated', y => statedEbitda[y]], ['Recomputed', y => +corrected[y]], ['Overstatement', y => statedEbitda[y] - corrected[y]]];
+  rows.forEach(([name, fn]) => { const tr = el('tr'); tr.appendChild(el('td', null, name));
+    years.forEach(y => { const v = fn(y); tr.appendChild(el('td', name === 'Overstatement' && Math.abs(v) > 0.005 ? 'neg' : null, fmt(v))); }); t.appendChild(tr); });
+  $('#ebitda').innerHTML = ''; $('#ebitda').appendChild(t); $('#ebitdaBox').hidden = false;
+}
+
+function renderBanner(r){
+  const b = $('#banner'); b.innerHTML = ''; const c = r.corrected_ebitda || {};
+  const y = Object.keys(statedEbitda).find(k => c[k] != null);
+  if (r.findings.length && y) {
+    const gap = statedEbitda[y] - (+c[y]), pct = Math.abs(gap) / Math.abs(+c[y]) * 100;
+    b.className = 'banner bad';
+    b.appendChild(el('span', 'big', `${y} EBITDA ${gap >= 0 ? 'overstated' : 'understated'} by ₹${fmt(Math.abs(gap))} crore (${pct.toFixed(0)}%)`));
+    b.appendChild(el('span', 'sub', `Stated ${fmt(statedEbitda[y])}, recomputed ${fmt(+c[y])}. ${r.findings.length} errors, each proven by sandbox output.`));
+  } else if (r.findings.length) {
+    b.className = 'banner bad'; b.appendChild(el('span', 'big', `${r.findings.length} proven errors`));
+  } else if (!(r.summary || '').startsWith('Stopped')) {
+    b.className = 'banner good'; b.appendChild(el('span', 'big', 'No errors proven'));
+    b.appendChild(el('span', 'sub', `Checks ran in ${r.sandbox_runs} sandbox run(s) and found nothing to report.`));
+  } else return;
+  b.hidden = false;
+}
+
+function renderProbe(ev){
+  const out = $('#probeOut'); out.innerHTML = '';
+  const lines = el('div', 'lines'); lines.style.marginTop = '10px';
+  (ev.stdout || '').trim().split('\n').forEach(line => {
+    const bad = /ALLOWED|READABLE|SENT/.test(line) && !/NOT REACHABLE|BLOCKED/.test(line);
+    lines.appendChild(el('div', /BLOCKED|NOT REACHABLE|empty/.test(line) ? 'blk' : (bad ? 'ok' : null), line));
+  });
+  out.appendChild(lines);
+}
+
+async function loadReport(){
+  clearInterval(timer);
+  const r = await (await fetch(`/api/jobs/${job}/report`)).json();
+  $('#stagePill').textContent = 'Done';
+  renderFindings(r.findings); $('#tFind').textContent = r.findings.length;
+  $('#tRej').textContent = r.rejected_findings.length; $('#tRuns').textContent = r.sandbox_runs;
+  const v = $('#verdict');
+  if (r.findings.length) { v.className = 'pill bad'; v.textContent = `${r.findings.length} proven errors`; }
+  else if ((r.summary || '').startsWith('Stopped')) { v.className = 'pill warn'; v.textContent = 'Incomplete'; }
+  else { v.className = 'pill ok'; v.textContent = 'No errors proven'; }
+  if (r.corrected_ebitda && Object.keys(r.corrected_ebitda).length) renderEbitda(r.corrected_ebitda);
+  renderBanner(r);
+  if (r.summary) { $('#summary').textContent = r.summary; $('#summaryBox').hidden = false; }
+}
+
+const drop = $('#drop'), fileIn = $('#file');
+drop.onclick = () => fileIn.click();
+drop.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') fileIn.click(); };
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) upload(e.dataTransfer.files[0]); };
+fileIn.onchange = () => fileIn.files[0] && upload(fileIn.files[0]);
+function upload(f){ const fd = new FormData(); fd.append('file', f); start(fd, f.name); }
+function demo(name){ const fd = new FormData(); fd.append('demo', name); start(fd, name === 'planted' ? 'halcyra_model_planted.xlsx' : 'halcyra_model_clean.xlsx'); }
+$('#demoPlanted').onclick = () => demo('planted');
+$('#demoClean').onclick = () => demo('clean');
+$('#probeBtn').onclick = async () => {
+  $('#probeBtn').disabled = true; $('#probeOut').textContent = 'Running inside the sandbox…';
+  const r = await fetch(`/api/jobs/${job}/attack`, {method:'POST'});
+  if (!r.ok) $('#probeOut').textContent = 'Could not run: ' + (await r.json()).detail;
+  setTimeout(() => $('#probeBtn').disabled = false, 3000);
+};
+loadConfig();
+</script>
+</body>
+</html>
